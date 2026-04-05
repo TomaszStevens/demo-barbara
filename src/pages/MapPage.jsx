@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, List, X, MapPin } from 'lucide-react';
-import { places, CATEGORIES } from '../data/places';
+import { Search, List, X, MapPin, Navigation } from 'lucide-react';
+import { places, CATEGORIES, distanceKm, formatDistance } from '../data/places';
 import MapView from '../components/MapView';
 import StarRating from '../components/StarRating';
 
@@ -9,6 +9,31 @@ export default function MapPage() {
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showList, setShowList] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationStatus, setLocationStatus] = useState('idle'); // idle | loading | granted | denied
+
+  const requestLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus('denied');
+      return;
+    }
+    setLocationStatus('loading');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation([pos.coords.latitude, pos.coords.longitude]);
+        setLocationStatus('granted');
+      },
+      () => {
+        setLocationStatus('denied');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }, []);
+
+  // Request location on mount
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
 
   const filteredPlaces = useMemo(() => {
     let results = [...places];
@@ -24,8 +49,18 @@ export default function MapPage() {
     if (selectedCategory) {
       results = results.filter((p) => p.category === selectedCategory);
     }
+
+    // Add distance and sort by it if we have user location
+    if (userLocation) {
+      results = results.map((p) => ({
+        ...p,
+        distance: distanceKm(userLocation[0], userLocation[1], p.lat, p.lng),
+      }));
+      results.sort((a, b) => a.distance - b.distance);
+    }
+
     return results;
-  }, [query, selectedCategory]);
+  }, [query, selectedCategory, userLocation]);
 
   return (
     <div className="h-[calc(100vh-64px)] md:h-[calc(100vh-64px)] relative flex flex-col md:flex-row">
@@ -57,6 +92,7 @@ export default function MapPage() {
         <div className="md:hidden flex items-center justify-between px-4 py-2">
           <span className="text-sm font-medium text-gray-900">
             {filteredPlaces.length} places
+            {userLocation && <span className="text-xs text-gray-400 font-normal ml-1">sorted by distance</span>}
           </span>
           <button
             onClick={() => setShowList(!showList)}
@@ -84,6 +120,30 @@ export default function MapPage() {
               </button>
             )}
           </div>
+
+          {/* Location status banner */}
+          {locationStatus === 'loading' && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">
+              <div className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+              Finding your location...
+            </div>
+          )}
+          {locationStatus === 'granted' && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-green-50 text-green-700 text-xs font-medium">
+              <Navigation size={12} />
+              Showing places nearest to you
+            </div>
+          )}
+          {locationStatus === 'denied' && (
+            <button
+              onClick={requestLocation}
+              className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-gray-50 text-gray-600 text-xs font-medium hover:bg-gray-100 transition-colors w-full"
+            >
+              <MapPin size={12} />
+              Enable location to sort by distance
+            </button>
+          )}
+
           <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
             <button
               onClick={() => setSelectedCategory('')}
@@ -134,7 +194,15 @@ export default function MapPage() {
                   {place.area}, {place.city}
                 </div>
               </div>
-              <span className="text-xs font-medium text-primary-600 self-center">{place.priceRange}</span>
+              <div className="flex flex-col items-end justify-center gap-1 flex-shrink-0">
+                <span className="text-xs font-medium text-primary-600">{place.priceRange}</span>
+                {place.distance != null && (
+                  <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                    <Navigation size={9} />
+                    {formatDistance(place.distance)}
+                  </span>
+                )}
+              </div>
             </Link>
           ))}
         </div>
@@ -142,7 +210,12 @@ export default function MapPage() {
 
       {/* Map */}
       <div className="flex-1 relative">
-        <MapView places={filteredPlaces} />
+        <MapView
+          places={filteredPlaces}
+          userLocation={userLocation}
+          onRequestLocation={requestLocation}
+          showLocateButton
+        />
       </div>
     </div>
   );
