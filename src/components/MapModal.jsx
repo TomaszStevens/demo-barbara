@@ -1,14 +1,24 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, MapPin, Navigation } from 'lucide-react';
 
 // Lazy-load so Leaflet isn't pulled in until the modal actually opens
 const MapView = lazy(() => import('./MapView'));
 
 export default function MapModal({ places, title, subtitle, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[90] flex flex-col">
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Portal to document.body so the modal escapes any parent CSS transforms
+  // (e.g. animate-fade-in uses transform which breaks fixed positioning)
+  return createPortal(
+    <div className="fixed inset-0 z-[90]">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div className="fixed inset-3 md:inset-8 flex flex-col rounded-2xl overflow-hidden shadow-2xl animate-scale-in bg-white z-[91]">
@@ -53,9 +63,9 @@ export default function MapModal({ places, title, subtitle, onClose }) {
           </Suspense>
         </div>
 
-        {/* Footer — single-place mode shows address + directions hint */}
+        {/* Footer */}
         {places.length === 1 && (
-          <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
+          <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between flex-shrink-0">
             <div className="text-xs text-gray-500 flex items-center gap-1.5">
               <Navigation size={12} />
               {places[0].address}, {places[0].area}, {places[0].city} {places[0].postcode}
@@ -66,13 +76,14 @@ export default function MapModal({ places, title, subtitle, onClose }) {
           </div>
         )}
         {places.length > 1 && (
-          <div className="px-4 py-2.5 border-t border-gray-100 bg-white">
+          <div className="px-4 py-2.5 border-t border-gray-100 bg-white flex-shrink-0">
             <p className="text-xs text-gray-500 text-center">
               Showing {places.length} {places.length === 1 ? 'place' : 'places'} — click a marker for details
             </p>
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
