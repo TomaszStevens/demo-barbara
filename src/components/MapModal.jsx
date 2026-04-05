@@ -11,9 +11,9 @@ export default function MapModal({ places, title, subtitle, onClose }) {
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative flex flex-col m-3 md:m-8 flex-1 rounded-2xl overflow-hidden shadow-2xl animate-scale-in bg-white">
+      <div className="fixed inset-3 md:inset-8 flex flex-col rounded-2xl overflow-hidden shadow-2xl animate-scale-in bg-white z-[91]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-white z-10 flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
               <MapPin size={16} className="text-primary-600" />
